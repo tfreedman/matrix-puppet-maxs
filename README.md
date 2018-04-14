@@ -27,7 +27,7 @@ For more information on puppetting, see: https://github.com/matrix-hacks/matrix-
 
 ## How does it work?
 
-Project MAXS by default talks over XMPP - it's a modular project in the sense that you can swap out the communication protocol it uses, but to date only maxs-transport-xmpp exists. We 
+Project MAXS by default talks over XMPP - it's a modular project in the sense that you can swap out the communication protocol it uses, but to date only maxs-transport-xmpp exists. Assuming this is bridged into Matrix (via mxpp), we effectively get a control channel, where all calling / texting / other stuff shows up. This is great in the sense that it works, but it isn't terribly user friendly. matrix-puppet-maxs watches if you send a message to any of the channels it controls (by default #phone_some_number), takes whatever message you sent, and then fires it through the control channel after prefixing it with the requisite magic (sms send phone-number  message) to make it actually send an SMS message. If a new message comes into the control channel, matrix-puppet-maxs will insert that message into the #phone_number channel, so that you have a coherent view of your SMS / calls to that number.
 
 ## installation
 
@@ -64,4 +64,5 @@ Restart your HS.
  - [x] Call notifications
  - [x] SMS sending / receiving
  - [x] Control room (for non SMS / call MAXS features)
+ - [ ] Backfilling history
 
