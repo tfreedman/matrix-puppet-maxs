@@ -1,0 +1,15 @@
+{
+  "registrationPath": "maxs-registration.yaml",
+  "controlRoom": "!the-room-maxs-is-running-in:tylerfreedman.com",
+  "port": 8087,
+  "bridge": {
+    "homeserverUrl": "https://tylerfreedman.com",
+    "domain": "tylerfreedman.com",
+    "registration": "maxs-registration.yaml"
+  },
+  "puppet": {
+    "id": "@tyler:tylerfreedman.com",
+    "localpart": "tyler",
+    "token": "some-long-auth-string"
+  }
+}
