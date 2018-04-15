@@ -13,13 +13,29 @@ Programs exist (called bridges) that will connect from Matrix to some other prot
 
 ## What exactly does this do?
 
-When you use mxpp + MAXS, all traffic to and from your phone is dumped into a single Matrix room. To send a text message saying 'hey' to a phone number, you have to prefix every outgoing message with 'sms send some-phone-number  hey'. Likewise, all phone calls will show up in the room the same way. This is fine in the sense that it works, but it gets annoying over time. A better solution is to create one room for each phone number, such that all messages to and from that room automatically go to the right place. The latter is what this program does - if you send a message in the channel #phone_4165551234:your-home-server, it'll be sent as an SMS message to 4165551234, and if you receive a reply from that number, it'll show up in that room as a message.
+When you use mxpp + MAXS, all traffic to and from your phone is dumped into a single Matrix room. To send a text message saying 'hey' to a phone number, you have to prefix every outgoing message with 'sms send some-phone-number  hey'. Likewise, all phone calls will show up in the room the same way. This is fine in the sense that it works, but it gets annoying over time. A better solution is to create one room for each phone number, such that all messages to and from that room automatically go to the right place. The latter is what this program does - if you send a message in the channel #phone_=14165551234:your-home-server, it'll be sent as an SMS message to +1 416 555 1234, and if you receive a reply from that number, it'll show up in that room as a message.
+
+## Why the = in front of each phone number / user account / room name?
+
+Phone numbers are complicated. Really complicated. There are a bunch of weird edge cases that arise from when we try to handle phone numbers in a number of circumstances. Consider:
+
+- If you text your friend at 416-555-1234 by joining #phone_4165551234 (or just dialing that on your phone), it'll go through if your cell phone is physically located in a NANP area.
+
+- If you take your phone to Australia and attempt to SMS/call that number, it won't work. Likewise, sending a message via Matrix to the room you were using before you got on a plane also won't work, because 416-555-1234 isn't routable in Australia.
+
+
+To work around these issues (and not produce the [exact](https://github.com/nextcloud/ocsms/issues/176
+) [same](https://github.com/tijder/SmsMatrix/issues/14) bug that every other Android SMS bridge seems to have), rooms will generally be created with canonical normalized numbers, which always include both the country code and international call prefix (+). Matrix MXIDs and room names can't contain '+' characters, so we'll use the next best thing, a '='.
+
+There are some exceptions to the whole 'canonical normalized number' thing. Some numbers aren't globally routable - things like emergency services, SMS short codes, and custom phone numbers (411, 611, etc) in North America won't work in different parts of the world, because they're specific to some region or carrier. If your carrier sends you an SMS message from 611 while in a NANP country, you'll be joined to a room called #phone_611, and that room won't work if you travel to Australia - there is no canonical form of that number, because that number only exists in certain countries, and calls different places depending on where you are.
+
+In short, you can join #phone_4165551234 if you really want, provided you're located in a region where that number would work. However, if you're joining a room to send a message, you should probably always include the =1 (or whatever your equivalent country code is), unless you want things to break while travelling or fail in odd ways later on (like having a second room be created with those characters in front when you receive a call or text message from that number). Rooms and users will be automatically created using those characters where applicable.
 
 ## What about just changing MAXS to work using Matrix instead - why does this need AppService permissions?
 
 Unfortunately, it isn't that simple. We can definitely ditch the MAXS <--XMPP--> XMPP Server <--mxpp--> Matrix part of the equation by replacing maxs-transport-xmpp with a hypothetical maxs-transport-matrix, but that's still only a partial solution. It would, at minimum, have the following problems:
 
-* MAXS would be limited to a single user account (you can open multiple chat rooms, but all of them would have the same person inside them) - to send an SMS message to a random phone number, you'd have to create a room (e.g. #phone_4165551234), invite MAXS to the room, and then send a message to the room. Using an AS, we can allow you to join #phone_4165551234 to send a message to that number, but more importantly, we can make the message appear to come from a user account specific to that one number (@phone_4165551234).
+* MAXS would be limited to a single user account (you can open multiple chat rooms, but all of them would have the same person inside them) - to send an SMS message to a random phone number, you'd have to create a room (e.g. #phone_=14165551234), invite MAXS to the room, and then send a message to the room. Using an AS, we can allow you to join #phone_=14165551234 to send a message to that number, but more importantly, we can make the message appear to come from a user account specific to that one number (@phone_=14165551234).
 
 * Messages sent from other Android SMS apps wouldn't be able to show up as coming from you within Matrix. Using an AS with Puppetting support means that when you send an SMS from your phone, you'll see a message that looks like it came from you within the respective Matrix chat window.
 
@@ -64,5 +80,6 @@ Restart your HS.
  - [x] Call notifications
  - [x] SMS sending / receiving
  - [x] Control room (for non SMS / call MAXS features)
+ - [x] Full canonical E.164 support
  - [ ] Backfilling history
 
