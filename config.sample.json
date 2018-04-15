@@ -1,4 +1,5 @@
 {
+  "defaultCountry": "CA",
   "registrationPath": "maxs-registration.yaml",
   "controlRoom": "!the-room-maxs-is-running-in:tylerfreedman.com",
   "port": 8087,
