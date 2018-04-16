@@ -29,6 +29,32 @@ get '/' do
   '{}'
 end
 
+get '/register' do
+  config = <<~EOF
+    id: #{SecureRandom.hex(32)}
+    hs_token: #{SecureRandom.hex(32)}
+    as_token: #{SecureRandom.hex(32)}
+    namespaces:
+      users:
+        - exclusive: true
+          regex: '@phone_.*'
+        - exclusive: false
+          regex: '@tyler:tylerfreedman\\.com'
+      aliases:
+        - exclusive: true
+          regex: '#phone_.*'
+      rooms: []
+    url: 'http://localhost:8087'
+    sender_localpart: phonebot
+    rate_limited: true
+  EOF
+  if !File.file?('maxs-registration.yaml')
+    File.open('registration.yaml', 'w') { |file| file.write(config) }
+  else
+    'There\'s already a registration file - delete maxs-registration.yaml to create a new one.'
+  end
+end
+
 put '/transactions/:txn_id' do
   content_type 'application/json'
   puts 'TRANSACTION: '
