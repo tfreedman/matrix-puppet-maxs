@@ -63,11 +63,11 @@ Copy `config.sample.json` to `config.json` and update it to match your setup.
 
 ## register the app service
 
-Generate a `maxs-registration.yaml` file 
+Generate a `maxs-registration.yaml` file by launching `ruby maxs.rb`, and going to `http://localhost:8087/register` in your browser.
 
 Note: The 'registration' setting in the config.json needs to set to the path of this file. By default, it already is.
 
-Copy this `maxs-registration.yaml` file to your home server. Make sure that from the perspective of the homeserver, the url is correctly pointing to your bridge server. e.g. `url: 'http://your-bridge-server.example.org:8090'` and is reachable.
+Copy this `maxs-registration.yaml` file to your home server. Make sure that from the perspective of the homeserver, the url is correctly pointing to your bridge server. e.g. `url: 'http://localhost:8087'` and is reachable.
 
 Edit your homeserver.yaml file and update the `app_service_config_files` with the path to the `maxs-registration.yaml` file.
 
