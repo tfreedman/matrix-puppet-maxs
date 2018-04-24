@@ -4,6 +4,7 @@ require 'httparty'
 require 'json'
 require 'yaml'
 require 'phonelib'
+require 'time'
 
 set :bind, '0.0.0.0'
 set :port, 8087
@@ -82,8 +83,10 @@ put '/transactions/:txn_id' do
         if Phonelib.parse(room).valid?
           room = Phonelib.parse(room).international.gsub(' ', '').gsub('+', '=')
         end
-        text = body.split(': ')[1]
-        matrix_send(text, "#phone_#{room}:#{$config['bridge']['domain']}", "@phone_#{room.gsub('+', '=')}:#{$config['bridge']['domain']}")
+        text = body.split(': ', 2)[1]
+        time = Time.parse(body.split(': ', 2)[0].split(' ')[-2..-1].join(' ')).to_i * 1000
+
+        matrix_send(text, "#phone_#{room}:#{$config['bridge']['domain']}", "@phone_#{room.gsub('+', '=')}:#{$config['bridge']['domain']}", time)
       elsif body.include?('is calling')
         if body.include?(') is calling')
           room = body.split('(')[1].split(')')[0]
@@ -123,9 +126,10 @@ get '/rooms/:room_name' do
         puts HTTParty.post("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/register?access_token=#{$config['as_token']}", :body => {"username" => username, "type" => "m.login.application_service"}.to_json)
         puts HTTParty.post("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room_id}/join?access_token=#{$config['as_token']}&user_id=@phone_#{username}:#{$config['bridge']['domain']}", :body => '{}')
         puts HTTParty.post("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room_id}/join?access_token=#{$config['as_token']}&user_id=#{$config['puppet']['id']}", :body => '{}')
+        puts HTTParty.put("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room_id}/state/m.room.power_levels?access_token=#{$config['as_token']}", :body => {'users' => {$config['puppet']['id'] => 100}}.to_json)
       end
       '{}'
-    elsif !params["access_token"].start_with?('bec')
+    else
       '{gtfo}'
     end
   else
