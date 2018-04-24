@@ -26,6 +26,34 @@ def maxs_send(message)
   return matrix_send(message, $config["controlRoom"], $config['puppet']['id'])
 end
 
+def parse_sms(message)
+  if (message.split(': ')[0].include?('('))
+    room = message.split('(')[1].split(')')[0]
+  else
+    room = message.split('From ')[1].split(' ')[0]
+  end
+
+  if Phonelib.parse(room).valid?
+    sender = Phonelib.parse(room).international
+  else
+    sender = room
+  end
+    
+  if message.start_with?('To ')
+    sender = $config['puppet']['id']
+  end
+
+  room = sender.gsub(' ', '').gsub('+', '=')
+
+  text = message.split(': ', 2)[1]
+  time = Time.parse(message.split(': ', 2)[0].split(' ')[-2..-1].join(' ')).to_i * 1000
+  return {time: time, room: room, content: text, sender: sender}
+end
+
+def backfill()
+
+end
+
 get '/' do
   '{}'
 end
@@ -67,7 +95,7 @@ put '/transactions/:txn_id' do
     room_id = event["room_id"]
     room_alias = JSON.parse(HTTParty.get("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room_id}/state/m.room.canonical_alias?access_token=#{$config['as_token']}").body)["alias"]
     puts room_alias
-    if room_alias && room_alias.start_with?('#phone_') && room_alias.end_with?(':' + $config["bridge"]["domain"]) && event["content"]["msgtype"] == 'm.text' && event["sender"] == $config["puppet"]["id"]
+    if room_alias && room_alias.start_with?('#phone_') && room_alias.end_with?(':' + $config["bridge"]["domain"]) && event["content"]["msgtype"] == 'm.text' && event["sender"] == $config["puppet"]["id"] && !event["content"]["body"].end_with?("\ufeff")
       phone_number = room_alias.split(':')[0].split('#phone_')[1].gsub('=', '+')
       puts "PHONE_NUMBER: #{phone_number}"
       text = event["content"]["body"]
@@ -75,18 +103,10 @@ put '/transactions/:txn_id' do
     elsif event["sender"] == "@phone:#{$config['bridge']['domain']}" && event["content"]["msgtype"] == 'm.text'
       body = event["content"]["body"]
       if body.include?("New SMS Received\n")
-        if (body.split(': ')[0].include?('('))
-          room = body.split('(')[1].split(')')[0]
-        else
-          room = body.split('From ')[1].split(' ')[0]
+        message = parse_message(body.split("New SMS Received\n")[1])
+        if message[:sender] != $config['puppet']['id']
+          matrix_send(message[:content], "#phone_#{message[:room]}:#{$config['bridge']['domain']}", "@phone_#{message[:room].gsub('+', '=')}:#{$config['bridge']['domain']}", message[:time])
         end
-        if Phonelib.parse(room).valid?
-          room = Phonelib.parse(room).international.gsub(' ', '').gsub('+', '=')
-        end
-        text = body.split(': ', 2)[1]
-        time = Time.parse(body.split(': ', 2)[0].split(' ')[-2..-1].join(' ')).to_i * 1000
-
-        matrix_send(text, "#phone_#{room}:#{$config['bridge']['domain']}", "@phone_#{room.gsub('+', '=')}:#{$config['bridge']['domain']}", time)
       elsif body.include?('is calling')
         if body.include?(') is calling')
           room = body.split('(')[1].split(')')[0]
@@ -97,6 +117,15 @@ put '/transactions/:txn_id' do
           room = Phonelib.parse(room).international.gsub(' ', '').gsub('+', '=')
         end
         matrix_send('calling...', "#phone_#{room}:#{$config['bridge']['domain']}", "@phone_#{room.gsub('+', '=')}:#{$config['bridge']['domain']}")
+      elsif body.split("\n", 2)[0].match("Last .* SMS messages")
+        # Backfill SMS messages
+        body = body.split("\n")
+        messages = []
+
+        messages.each do |m|
+          message = parse_message(m)
+          # Do stuff with this.
+        end
       end
     else
       #what do
@@ -127,6 +156,7 @@ get '/rooms/:room_name' do
         puts HTTParty.post("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room_id}/join?access_token=#{$config['as_token']}&user_id=@phone_#{username}:#{$config['bridge']['domain']}", :body => '{}')
         puts HTTParty.post("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room_id}/join?access_token=#{$config['as_token']}&user_id=#{$config['puppet']['id']}", :body => '{}')
         puts HTTParty.put("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room_id}/state/m.room.power_levels?access_token=#{$config['as_token']}", :body => {'users' => {$config['puppet']['id'] => 100}}.to_json)
+        puts HTTParty.put("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/profile/@phone_#{username}:#{$config['bridge']['domain']}/displayname?access_token=#{$config['as_token']}&user_id=@phone_#{username}:#{$config['bridge']['domain']}", :body => {"displayname" => phone_number}.to_json)
       end
       '{}'
     else
