@@ -19,6 +19,21 @@ def matrix_send(message, room, user, timestamp = Time.now.to_i * 1000)
   if room.start_with?('#')
     room = JSON.parse(HTTParty.get("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/directory/room/#{CGI::escape(room)}?access_token=#{$config['as_token']}").body)["room_id"]
   end
+  members = JSON.parse(HTTParty.get("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room}/joined_members?access_token=#{$config['as_token']}").body)["joined"]
+
+  contains_puppet = false
+  members.to_a.each do |member|
+    if member[0] == $config['puppet']['id']
+      contains_puppet = true
+      break
+    end
+  end
+
+  if !contains_puppet
+    HTTParty.post("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room}/invite?access_token=#{$config['as_token']}", :body => {"user_id" => $config['puppet']['id']}.to_json) # have the server re-invite them
+    HTTParty.post("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room}/join?access_token=#{$config['as_token']}&user_id=#{$config['puppet']['id']}", :body => '{}') #rejoin them to the room
+  end
+
   return HTTParty.post("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/rooms/#{room}/send/m.room.message?access_token=#{$config['as_token']}&ts=#{timestamp}&user_id=#{user}", :body => {"msgtype" => "m.text", "body" => "#{message}"}.to_json)
 end
 
@@ -103,7 +118,7 @@ put '/transactions/:txn_id' do
     elsif event["sender"] == "@phone:#{$config['bridge']['domain']}" && event["content"]["msgtype"] == 'm.text'
       body = event["content"]["body"]
       if body.include?("New SMS Received\n")
-        message = parse_message(body.split("New SMS Received\n")[1])
+        message = parse_sms(body.split("New SMS Received\n")[1])
         if message[:sender] != $config['puppet']['id']
           matrix_send(message[:content], "#phone_#{message[:room]}:#{$config['bridge']['domain']}", "@phone_#{message[:room].gsub('+', '=')}:#{$config['bridge']['domain']}", message[:time])
         end
@@ -123,7 +138,7 @@ put '/transactions/:txn_id' do
         messages = []
 
         messages.each do |m|
-          message = parse_message(m)
+          message = parse_sms(m)
           # Do stuff with this.
         end
       end
