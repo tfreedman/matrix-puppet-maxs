@@ -69,6 +69,41 @@ def backfill()
 
 end
 
+def message_exists?(message)
+  room_alias = CGI::escape("#phone_#{message[:room]}:#{$config['bridge']['domain']}")
+  room_id = JSON.parse(HTTParty.get("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/directory/room/#{room_alias}?access_token=#{$config['as_token']}").body)["room_id"]
+  search_json = {
+     'search_categories' => {
+        'room_events' => {
+           'search_term' => message[:content],
+           'sender' => "@phone_#{message[:sender].gsub(' ', '').gsub('+', '=')}:#{$config['bridge']['domain']}",
+           'filter' => {
+              'rooms' => [
+                 room_id
+              ]
+           },
+           'order_by' => 'recent',
+           'event_context' => {
+              'before_limit' => 0,
+              'after_limit' => 0,
+              'include_profile' => false
+           }
+        }
+     }
+  }
+
+  search_results = JSON.parse(HTTParty.post("#{$config['bridge']['homeserverUrl']}/_matrix/client/r0/search?access_token=#{$config['as_token']}&user_id=#{$config['puppet']['id']}", :body => search_json.to_json).body)
+
+  exists = false
+  search_results["search_categories"]["room_events"]["results"].each do |r|
+    if (message[:time] - r["result"]["origin_server_ts"]).abs <= 1000 && message[:content] == r["result"]["content"]["body"] && r["result"]["sender"] == "@phone_#{message[:sender].gsub(' ', '').gsub('+', '=')}:#{$config['bridge']['domain']}" && room_id == r["result"]["room_id"]
+      exists = true
+      break
+    end
+  end
+  return exists
+end
+
 get '/' do
   '{}'
 end
@@ -119,6 +154,7 @@ put '/transactions/:txn_id' do
       body = event["content"]["body"]
       if body.include?("New SMS Received\n")
         message = parse_sms(body.split("New SMS Received\n")[1])
+        puts message.inspect
         if message[:sender] != $config['puppet']['id']
           matrix_send(message[:content], "#phone_#{message[:room]}:#{$config['bridge']['domain']}", "@phone_#{message[:room].gsub('+', '=')}:#{$config['bridge']['domain']}", message[:time])
         end
@@ -134,12 +170,18 @@ put '/transactions/:txn_id' do
         matrix_send('calling...', "#phone_#{room}:#{$config['bridge']['domain']}", "@phone_#{room.gsub('+', '=')}:#{$config['bridge']['domain']}")
       elsif body.split("\n", 2)[0].match("Last .* SMS messages")
         # Backfill SMS messages
-        body = body.split("\n")
-        messages = []
-
+        body = body.split("\n", 2)[1]
+        messages = body.scan(/\n(From|To)\s+(.*?)(?=(?=\n(?=From|To)|$))/)
         messages.each do |m|
-          message = parse_sms(m)
-          # Do stuff with this.
+          if m[0] == "From"
+            message = parse_sms("#{m[0]} #{m[1]}")
+            puts "#{message.inspect} - #{message_exists?(message)}"
+            if !message_exists?(message)
+              if message[:sender] != $config['puppet']['id']
+                matrix_send(message[:content], "#phone_#{message[:room]}:#{$config['bridge']['domain']}", "@phone_#{message[:room].gsub('+', '=')}:#{$config['bridge']['domain']}", message[:time]) #Backfill it!
+              end
+            end
+          end
         end
       end
     else
