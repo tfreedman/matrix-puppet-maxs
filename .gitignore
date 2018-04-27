@@ -1,3 +1,5 @@
 /config.json
 /maxs-registration.yaml
 /sms.db
+/sms*.xml
+/calls*.xml

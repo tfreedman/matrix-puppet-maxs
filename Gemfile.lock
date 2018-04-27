@@ -19,9 +19,12 @@ GEM
     i18n (1.0.1)
       concurrent-ruby (~> 1.0)
     json (2.1.0)
+    mini_portile2 (2.3.0)
     minitest (5.11.3)
     multi_xml (0.6.0)
     mustermann (1.0.2)
+    nokogiri (1.8.2)
+      mini_portile2 (~> 2.3.0)
     phonelib (0.6.21)
     rack (2.0.4)
     rack-protection (2.0.1)
@@ -44,6 +47,7 @@ DEPENDENCIES
   activerecord
   httparty
   json
+  nokogiri
   phonelib
   sinatra
   sqlite3
